@@ -7,15 +7,14 @@ Open Source con Prometheus y Grafana sobre AWS Academy Learner Lab.
 
 ```
 .github/workflows/
-  ep2-infraestructura.yaml   # Run workflow: apply | plan | destroy
-  ep2-terraform.yaml         # plantilla reutilizable por capa
-  ep2-backend-estado.yaml    # bucket S3 del estado (andys-tfstate-<cuenta>)
-  ep2-validar.yaml           # fmt + validate en cada push
+  infraestructura.yaml   # Run workflow: apply | plan | destroy
 EP2/
-  infra/plataforma/          # backend y valores para el Terraform del docente
-  infra/monitoreo/           # Terraform propio: EC2 andys-monitoreo + Security Groups
-  script/bootstrap-tfstate.sh
+  infra/plataforma/      # backend y valores para el Terraform del docente
+  infra/monitoreo/       # Terraform propio: EC2 andys-monitoreo + Security Groups
 ```
+
+El estado de ambas capas se guarda en el bucket `andys-tfstate-<cuenta>`, que el propio workflow
+crea si no existe.
 
 ## Infraestructura
 

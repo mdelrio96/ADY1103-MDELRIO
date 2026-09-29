@@ -1,0 +1,138 @@
+# ─────────────────────────────────────────────────────────────
+# EP2 · Infraestructura AndysMotors en AWS Academy Learner Lab
+# Actions → "EP2 · Infraestructura" → Run workflow
+#
+#   apply    plataforma (Terraform del docente) → monitoreo (EP2/infra/monitoreo)
+#   plan     igual, solo revisa
+#   destroy  monitoreo → plataforma (el monitoreo agrega reglas a los SG de la plataforma)
+#
+# El estado de ambas capas vive en el bucket andys-tfstate-<cuenta>, que se crea
+# aquí mismo si no existe (p. ej. tras un reset del lab).
+# Prometheus, Grafana y exporters NO se instalan aquí: se hace a mano en andys-monitoreo.
+# ─────────────────────────────────────────────────────────────
+
+name: EP2 · Infraestructura
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: apply (levantar) · plan (solo revisar) · destroy (bajar todo)
+        required: true
+        type: choice
+        options: [apply, plan, destroy]
+        default: apply
+
+permissions:
+  contents: read
+
+# Nunca dos ejecuciones sobre el mismo estado a la vez.
+concurrency:
+  group: andys-ep2-infra
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  # Terraform del docente, en un commit fijo: si el docente sube cambios, el
+  # despliegue no cambia hasta actualizar la variable UPSTREAM_REF.
+  UPSTREAM_REF: ${{ vars.UPSTREAM_REF || '8add424f7503f78527ad44b627f4f2e4decd666b' }}
+  DIR_PLATAFORMA: upstream/Casos/AndysMotors/infra
+  DIR_MONITOREO: EP2/infra/monitoreo
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "0"
+  TF_VAR_admin_cidr: ${{ secrets.ADMIN_CIDR }}
+  TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+  TF_VAR_admin_token: ${{ secrets.ANDYS_ADMIN_TOKEN }}
+  # Obligatoria en el Terraform del docente aunque su monitoreo esté apagado.
+  TF_VAR_grafana_admin_password: no-se-usa-en-ep2
+
+jobs:
+  terraform:
+    name: terraform ${{ inputs.action }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Descargar Terraform del docente
+        uses: actions/checkout@v4
+        with:
+          repository: asanchezo-duoc/ADY1103-Activities
+          ref: ${{ env.UPSTREAM_REF }}
+          path: upstream
+
+      # Al código del docente solo se le agrega el backend remoto y los valores de la EP2.
+      - name: Preparar plataforma
+        run: |
+          cp EP2/infra/plataforma/backend.tf "$DIR_PLATAFORMA/backend.tf"
+          cp EP2/infra/plataforma/plataforma.tfvars "$DIR_PLATAFORMA/ep2.auto.tfvars"
+
+      - name: Configurar credenciales AWS (Learner Lab)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # El backend necesita el bucket antes del init, así que no puede ser un
+      # recurso de Terraform. Idempotente: si ya existe no se toca.
+      - name: Bucket del estado
+        run: |
+          BUCKET="andys-tfstate-$(aws sts get-caller-identity --query Account --output text)"
+          if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+            echo "Bucket $BUCKET: ya existe."
+          else
+            aws s3api create-bucket --bucket "$BUCKET" --region "$AWS_REGION" > /dev/null
+            aws s3api wait bucket-exists --bucket "$BUCKET"
+            aws s3api put-bucket-versioning --bucket "$BUCKET" \
+              --versioning-configuration Status=Enabled
+            aws s3api put-public-access-block --bucket "$BUCKET" \
+              --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+            echo "Bucket $BUCKET: creado."
+          fi
+          echo "BUCKET=$BUCKET" >> "$GITHUB_ENV"
+          echo "TF_VAR_tfstate_bucket=$BUCKET" >> "$GITHUB_ENV"
+
+      - name: Instalar Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+
+      - name: Terraform init + validate
+        run: |
+          for DIR in "$DIR_PLATAFORMA" "$DIR_MONITOREO"; do
+            terraform -chdir="$DIR" init -input=false -backend-config="bucket=$BUCKET"
+            terraform -chdir="$DIR" validate
+          done
+
+      - name: Terraform ${{ inputs.action }}
+        run: |
+          case "${{ inputs.action }}" in
+            apply)
+              terraform -chdir="$DIR_PLATAFORMA" apply -auto-approve
+              terraform -chdir="$DIR_MONITOREO"  apply -auto-approve
+              ;;
+            plan)
+              terraform -chdir="$DIR_PLATAFORMA" plan
+              terraform -chdir="$DIR_MONITOREO"  plan
+              ;;
+            destroy)
+              terraform -chdir="$DIR_MONITOREO"  destroy -auto-approve
+              terraform -chdir="$DIR_PLATAFORMA" destroy -auto-approve
+              ;;
+          esac
+
+      - name: Resumen
+        if: inputs.action == 'apply'
+        run: |
+          salidas() { terraform -chdir="$1" output -json \
+            | jq 'with_entries(select(.value.sensitive | not)) | del(.siguientes_pasos) | map_values(.value)'; }
+          {
+            echo "### Plataforma AndysMotors"
+            echo '```json'; salidas "$DIR_PLATAFORMA"; echo '```'
+            echo "### andys-monitoreo"
+            echo '```json'; salidas "$DIR_MONITOREO"; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
