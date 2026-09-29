@@ -24,15 +24,18 @@ El workflow crea solo red y cómputo. Ambas instancias son Ubuntu 24.04, parten 
 
 | Security Group | Puerto | Origen | Uso |
 |---|---|---|---|
-| `andys-monitoreo-sg` | 22, 3000, 9090 | `ADMIN_CIDR` | SSH, Grafana, Prometheus |
-| `andys-plataforma-sg` | 22, 80, 8081–8086, 8404 | `ADMIN_CIDR` | SSH, sitio, portales internos, HAProxy `/stats` |
+| `andys-monitoreo-sg` | 22, 3000, 9090 | Internet | SSH, Grafana, Prometheus |
+| `andys-plataforma-sg` | 22, 80, 8081–8086, 8404 | Internet | SSH, sitio, portales internos, HAProxy `/stats` |
 | `andys-plataforma-sg` | 80 | `andys-monitoreo-sg` | generador de tráfico |
 | `andys-plataforma-sg` | 8081–8086 | `andys-monitoreo-sg` | `/metrics` de web, stock, agenda, CRM, pagos y gateway |
 | `andys-plataforma-sg` | 8404 | `andys-monitoreo-sg` | métricas de HAProxy |
 | `andys-plataforma-sg` | 9100, 9187 | `andys-monitoreo-sg` | node-exporter, postgres-exporter |
 
+Todo se accede con la IP pública de cada EC2. Para restringir el acceso a un solo equipo, cambiar
+`admin_cidr` en `EP2/infra/variables.tf` (por ejemplo `"200.83.12.45/32"`).
+
 El scraping usa el Security Group de monitoreo como origen, no una IP: las reglas siguen valiendo
-aunque la instancia cambie de dirección. Los exporters no quedan expuestos a Internet.
+aunque la instancia cambie de dirección. Los exporters (9100, 9187) no quedan expuestos a Internet.
 
 ## Configuración (una vez)
 
@@ -41,7 +44,6 @@ Settings → Secrets and variables → Actions:
 | Secret | Valor |
 |---|---|
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` | Learner Lab → AWS Details → AWS CLI. **Se actualizan en cada sesión del lab.** |
-| `ADMIN_CIDR` | IP pública propia en formato `x.x.x.x/32` (<https://checkip.amazonaws.com>) |
 
 ## Uso
 

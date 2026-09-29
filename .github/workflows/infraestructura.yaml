@@ -34,7 +34,6 @@ env:
   AWS_REGION: us-east-1
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "0"
-  TF_VAR_admin_cidr: ${{ secrets.ADMIN_CIDR }}
 
 defaults:
   run:

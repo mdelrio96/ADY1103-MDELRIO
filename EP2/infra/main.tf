@@ -87,7 +87,7 @@ locals {
     "postgres-exporter"                         = 9187
   }
 
-  # Puertos de la plataforma abiertos al administrador.
+  # Puertos de la plataforma accesibles por IP publica (var.admin_cidr).
   puertos_admin_plataforma = {
     "SSH"                         = 22
     "sitio web publico"           = 80
@@ -100,7 +100,7 @@ locals {
 
 resource "aws_security_group" "monitoreo" {
   name        = "andys-monitoreo-sg"
-  description = "Prometheus y Grafana: acceso solo desde la IP del administrador"
+  description = "Prometheus y Grafana de AndysMotors"
   vpc_id      = data.aws_vpc.default.id
 
   tags = { Name = "andys-monitoreo-sg" }
@@ -114,7 +114,7 @@ resource "aws_vpc_security_group_ingress_rule" "monitoreo_admin" {
   }
 
   security_group_id = aws_security_group.monitoreo.id
-  description       = "${each.key} desde el administrador"
+  description       = "${each.key} por IP publica"
   cidr_ipv4         = var.admin_cidr
   from_port         = each.value
   to_port           = each.value
@@ -132,7 +132,7 @@ resource "aws_vpc_security_group_egress_rule" "monitoreo_salida" {
 
 resource "aws_security_group" "plataforma" {
   name        = "andys-plataforma-sg"
-  description = "Plataforma AndysMotors: administrador y scraping desde el monitoreo"
+  description = "Plataforma AndysMotors: acceso por IP publica y scraping desde el monitoreo"
   vpc_id      = data.aws_vpc.default.id
 
   tags = { Name = "andys-plataforma-sg" }
@@ -155,7 +155,7 @@ resource "aws_vpc_security_group_ingress_rule" "plataforma_admin" {
   for_each = local.puertos_admin_plataforma
 
   security_group_id = aws_security_group.plataforma.id
-  description       = "${each.key} desde el administrador"
+  description       = "${each.key} por IP publica"
   cidr_ipv4         = var.admin_cidr
   from_port         = each.value == null ? 8081 : each.value
   to_port           = each.value == null ? 8086 : each.value

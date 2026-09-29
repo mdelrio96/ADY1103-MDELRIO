@@ -5,8 +5,13 @@ variable "aws_region" {
 }
 
 variable "admin_cidr" {
-  description = "IP pública del administrador en formato /32 (SSH, Grafana, Prometheus, sitio)."
+  description = <<-EOT
+    Desde dónde se accede por IP pública a SSH, Grafana, Prometheus y la plataforma.
+    Por defecto, cualquier origen. Para restringirlo a un equipo: "x.x.x.x/32".
+    Los exporters (9100, 9187) nunca se abren aquí: solo desde andys-monitoreo.
+  EOT
   type        = string
+  default     = "0.0.0.0/0"
 
   validation {
     condition     = can(cidrhost(var.admin_cidr, 0))
