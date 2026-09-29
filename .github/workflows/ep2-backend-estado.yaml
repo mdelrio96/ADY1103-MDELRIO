@@ -1,0 +1,49 @@
+# ─────────────────────────────────────────────────────────────
+# EP2 · Backend de estado de Terraform (bucket S3) en AWS Academy Learner Lab
+#
+# Crea andys-tfstate-<cuenta> si no existe; lo que ya existe no se toca.
+# - workflow_call: lo invoca ep2-infraestructura.yaml antes de cualquier init.
+# - workflow_dispatch: para dejarlo listo por separado (p. ej. tras un reset del lab).
+#
+# Mismo comando que en local: ./EP2/script/bootstrap-tfstate.sh
+# ─────────────────────────────────────────────────────────────
+
+name: EP2 · Backend de estado (S3)
+
+on:
+  workflow_call:
+    outputs:
+      bucket:
+        description: Nombre del bucket del estado
+        value: ${{ jobs.backend.outputs.bucket }}
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: bucket S3 del estado
+    runs-on: ubuntu-latest
+    outputs:
+      bucket: ${{ steps.bootstrap.outputs.bucket }}
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciales AWS (Learner Lab)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Crear bucket si no existe
+        id: bootstrap
+        run: |
+          BUCKET="$(bash EP2/script/bootstrap-tfstate.sh us-east-1)"
+          echo "bucket=$BUCKET" >> "$GITHUB_OUTPUT"
+          echo "### EP2 — Backend de estado: \`$BUCKET\`" >> "$GITHUB_STEP_SUMMARY"

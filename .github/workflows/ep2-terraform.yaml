@@ -1,0 +1,129 @@
+# ─────────────────────────────────────────────────────────────
+# EP2 · Plantilla reutilizable: terraform init / plan / apply / destroy de una capa
+#
+#   capa = plataforma   Terraform del docente (asanchezo-duoc/ADY1103-Activities,
+#                       Casos/AndysMotors/infra) en el commit vars.UPSTREAM_REF,
+#                       sin modificar: solo se le agregan backend.tf y los valores
+#                       de EP2/infra/plataforma.
+#   capa = monitoreo    Terraform propio de EP2/infra/monitoreo.
+#
+# La invoca ep2-infraestructura.yaml; no se ejecuta sola.
+# ─────────────────────────────────────────────────────────────
+
+name: EP2 · Terraform (plantilla)
+
+on:
+  workflow_call:
+    inputs:
+      capa:
+        description: plataforma · monitoreo
+        required: true
+        type: string
+      action:
+        description: apply · plan · destroy
+        required: true
+        type: string
+      tfstate_bucket:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  UPSTREAM_REPO: asanchezo-duoc/ADY1103-Activities
+  # Commit del docente con el que se validó este despliegue. Se cambia a propósito
+  # (variable UPSTREAM_REF del repositorio), nunca solo.
+  UPSTREAM_REF: ${{ vars.UPSTREAM_REF || '8add424f7503f78527ad44b627f4f2e4decd666b' }}
+
+jobs:
+  terraform:
+    name: ${{ inputs.capa }} · terraform ${{ inputs.action }}
+    runs-on: ubuntu-latest
+    # Nunca dos operaciones sobre el mismo estado a la vez.
+    concurrency:
+      group: andys-ep2-${{ inputs.capa }}
+      cancel-in-progress: false
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "0"
+      TF_VAR_admin_cidr: ${{ secrets.ADMIN_CIDR }}
+      TF_VAR_tfstate_bucket: ${{ inputs.tfstate_bucket }}
+      TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
+      TF_VAR_admin_token: ${{ secrets.ANDYS_ADMIN_TOKEN }}
+      # Obligatoria en el Terraform del docente aunque su monitoreo esté apagado.
+      TF_VAR_grafana_admin_password: no-se-usa-en-ep2
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Descargar Terraform del docente
+        if: inputs.capa == 'plataforma'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.UPSTREAM_REPO }}
+          ref: ${{ env.UPSTREAM_REF }}
+          path: upstream
+
+      - name: Preparar directorio de trabajo
+        run: |
+          if [ "${{ inputs.capa }}" = "plataforma" ]; then
+            TF_DIR=upstream/Casos/AndysMotors/infra
+            cp EP2/infra/plataforma/backend.tf "$TF_DIR/backend.tf"
+            cp EP2/infra/plataforma/plataforma.tfvars "$TF_DIR/ep2.auto.tfvars"
+          else
+            TF_DIR=EP2/infra/monitoreo
+          fi
+          echo "TF_DIR=$TF_DIR" >> "$GITHUB_ENV"
+
+      - name: Configurar credenciales AWS (Learner Lab)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Instalar Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.8
+          terraform_wrapper: false
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform init -input=false -backend-config="bucket=${{ inputs.tfstate_bucket }}"
+
+      - name: Terraform validate
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform validate
+
+      - name: Terraform plan
+        if: inputs.action == 'plan'
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          terraform plan -input=false -no-color | tee plan.txt
+          { echo "### ${{ inputs.capa }} · terraform plan"; echo '```'; tail -n 200 plan.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Terraform apply
+        if: inputs.action == 'apply'
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform apply -input=false -auto-approve
+
+      - name: Terraform destroy
+        if: inputs.action == 'destroy'
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform destroy -input=false -auto-approve
+
+      - name: Publicar salidas
+        if: inputs.action == 'apply'
+        working-directory: ${{ env.TF_DIR }}
+        run: |
+          {
+            echo "### ${{ inputs.capa }} · salidas"
+            echo '```json'
+            terraform output -json \
+              | jq 'with_entries(select(.value.sensitive | not)) | del(.siguientes_pasos) | map_values(.value)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

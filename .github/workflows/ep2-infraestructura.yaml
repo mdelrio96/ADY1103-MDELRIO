@@ -1,0 +1,78 @@
+# ─────────────────────────────────────────────────────────────
+# EP2 · Infraestructura AndysMotors (Actions → "EP2 · Infraestructura" → Run workflow)
+#
+#   apply    backend de estado → plataforma (docente) → monitoreo (propio)
+#   plan     igual, solo revisa (el plan de monitoreo requiere la plataforma ya creada)
+#   destroy  monitoreo → plataforma, en ese orden: el monitoreo agrega reglas a
+#            los Security Groups de la plataforma y deben salir primero.
+#
+# Lo que NO hace: instalar Prometheus, Grafana ni exporters. Eso se hace a mano
+# sobre andys-monitoreo, según el instrumento de la EP2.
+# ─────────────────────────────────────────────────────────────
+
+name: EP2 · Infraestructura (apply / plan / destroy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: apply (levantar) · plan (solo revisar) · destroy (bajar todo)
+        required: true
+        type: choice
+        options: [apply, plan, destroy]
+        default: apply
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend de estado
+    uses: ./.github/workflows/ep2-backend-estado.yaml
+    secrets: inherit
+
+  # ── Levantar / revisar ────────────────────────────────────
+  plataforma:
+    name: Plataforma
+    needs: backend
+    if: inputs.action != 'destroy'
+    uses: ./.github/workflows/ep2-terraform.yaml
+    with:
+      capa: plataforma
+      action: ${{ inputs.action }}
+      tfstate_bucket: ${{ needs.backend.outputs.bucket }}
+    secrets: inherit
+
+  monitoreo:
+    name: Monitoreo
+    needs: [backend, plataforma]
+    if: inputs.action != 'destroy'
+    uses: ./.github/workflows/ep2-terraform.yaml
+    with:
+      capa: monitoreo
+      action: ${{ inputs.action }}
+      tfstate_bucket: ${{ needs.backend.outputs.bucket }}
+    secrets: inherit
+
+  # ── Bajar todo ────────────────────────────────────────────
+  monitoreo_destroy:
+    name: Monitoreo (destroy)
+    needs: backend
+    if: inputs.action == 'destroy'
+    uses: ./.github/workflows/ep2-terraform.yaml
+    with:
+      capa: monitoreo
+      action: destroy
+      tfstate_bucket: ${{ needs.backend.outputs.bucket }}
+    secrets: inherit
+
+  plataforma_destroy:
+    name: Plataforma (destroy)
+    needs: [backend, monitoreo_destroy]
+    if: inputs.action == 'destroy'
+    uses: ./.github/workflows/ep2-terraform.yaml
+    with:
+      capa: plataforma
+      action: destroy
+      tfstate_bucket: ${{ needs.backend.outputs.bucket }}
+    secrets: inherit

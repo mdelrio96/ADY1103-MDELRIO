@@ -1,0 +1,12 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+plan.txt
+crash.log
+terraform.tfvars
+*.auto.tfvars
+# Credenciales del lab
+*.pem
+.env
