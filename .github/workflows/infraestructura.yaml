@@ -2,7 +2,8 @@
 # EP2 · Infraestructura AndysMotors en AWS Academy Learner Lab
 # Actions → "EP2 · Infraestructura" → Run workflow
 #
-#   apply    crea andys-plataforma, andys-monitoreo y sus Security Groups
+#   apply    crea andys-plataforma, andys-monitoreo y sus Security Groups, e
+#            instala Docker + Compose en ambas por SSH (termina cuando están listas)
 #   plan     solo revisa
 #   destroy  elimina todo
 #
@@ -34,6 +35,8 @@ env:
   AWS_REGION: us-east-1
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "0"
+  # Contenido de labsuser.pem: Terraform instala Docker por SSH durante el apply.
+  TF_VAR_ssh_private_key: ${{ secrets.LAB_PEM }}
 
 defaults:
   run:

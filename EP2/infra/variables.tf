@@ -31,6 +31,12 @@ variable "instance_type_monitoreo" {
   default     = "t3.small"
 }
 
+variable "ssh_private_key" {
+  description = "Contenido de labsuser.pem (llave vockey). Terraform lo usa para instalar Docker por SSH."
+  type        = string
+  sensitive   = true
+}
+
 variable "key_name" {
   description = "Par de llaves del Learner Lab."
   type        = string

@@ -8,14 +8,15 @@ Open Source con Prometheus y Grafana sobre AWS Academy Learner Lab.
 ```
 .github/workflows/infraestructura.yaml   # Run workflow: apply | plan | destroy
 EP2/infra/                               # Terraform: 2 EC2 + Security Groups
-EP2/infra/scripts/instalar-docker.sh     # user_data: Docker Engine + Compose
+EP2/infra/scripts/instalar-docker.sh     # Docker Engine + Compose, ejecutado por SSH en el apply
 ```
 
 ## Infraestructura
 
-El workflow crea red y cómputo. Ambas instancias son Ubuntu 24.04 y arrancan con Docker Engine y
-Docker Compose instalados ([`EP2/infra/scripts/instalar-docker.sh`](EP2/infra/scripts/instalar-docker.sh),
-unos 2 minutos después de crearse). La plataforma, los exporters y el stack de monitoreo se instalan a mano.
+El workflow crea red y cómputo. Ambas instancias son Ubuntu 24.04. Durante el `apply`, Terraform se
+conecta por SSH a cada una y ejecuta [`EP2/infra/scripts/instalar-docker.sh`](EP2/infra/scripts/instalar-docker.sh):
+cuando el workflow termina, Docker Engine y Docker Compose ya están listos y el usuario `ubuntu` los usa
+sin `sudo`. La plataforma, los exporters y el stack de monitoreo se instalan a mano.
 
 | Instancia | Tipo | Para qué |
 |---|---|---|
@@ -46,6 +47,7 @@ Settings → Secrets and variables → Actions:
 | Secret | Valor |
 |---|---|
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` | Learner Lab → AWS Details → AWS CLI. **Se actualizan en cada sesión del lab.** |
+| `LAB_PEM` | contenido completo de `labsuser.pem` (AWS Details → Download PEM), desde `-----BEGIN` hasta `-----END ... KEY-----`. Se carga una vez. |
 
 ## Uso
 

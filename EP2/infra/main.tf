@@ -6,8 +6,9 @@
 #                     (Casos/AndysMotors/demo del repositorio del docente)
 #   andys-monitoreo   aquí se instalan Prometheus y Grafana
 #
-# Ambas máquinas arrancan con Docker Engine y Docker Compose instalados
-# (scripts/instalar-docker.sh). Todo lo demás se instala a mano.
+# Durante el apply, Terraform instala Docker Engine y Docker Compose en ambas
+# por SSH (scripts/instalar-docker.sh) y espera a que termine. Todo lo demás
+# se instala a mano.
 # ─────────────────────────────────────────────────────────────
 
 terraform {
@@ -181,11 +182,6 @@ resource "aws_instance" "plataforma" {
   key_name                    = var.key_name
   associate_public_ip_address = true
 
-  # Instala Docker en el primer arranque. Si el script cambia, la instancia se
-  # recrea: user_data solo se ejecuta una vez y, sin esto, el cambio no tendría efecto.
-  user_data                   = file("${path.module}/scripts/instalar-docker.sh")
-  user_data_replace_on_change = true
-
   root_block_device {
     volume_size           = var.root_volume_size
     volume_type           = "gp3"
@@ -210,11 +206,6 @@ resource "aws_instance" "monitoreo" {
   key_name                    = var.key_name
   associate_public_ip_address = true
 
-  # Instala Docker en el primer arranque. Si el script cambia, la instancia se
-  # recrea: user_data solo se ejecuta una vez y, sin esto, el cambio no tendría efecto.
-  user_data                   = file("${path.module}/scripts/instalar-docker.sh")
-  user_data_replace_on_change = true
-
   root_block_device {
     volume_size           = var.root_volume_size
     volume_type           = "gp3"
@@ -228,4 +219,41 @@ resource "aws_instance" "monitoreo" {
   }
 
   tags = { Name = "andys-monitoreo", Rol = "monitoreo" }
+}
+
+# ── Docker en ambas instancias, durante el apply ────────────────────────────
+# Terraform se conecta por SSH con la llave del lab, sube el script y lo
+# ejecuta. El apply no termina hasta que Docker queda listo en las dos EC2.
+# Se vuelve a ejecutar si la instancia se recrea o si el script cambia.
+resource "terraform_data" "docker" {
+  for_each = {
+    plataforma = aws_instance.plataforma
+    monitoreo  = aws_instance.monitoreo
+  }
+
+  triggers_replace = [
+    each.value.id,
+    filesha256("${path.module}/scripts/instalar-docker.sh"),
+  ]
+
+  connection {
+    type        = "ssh"
+    host        = each.value.public_ip
+    user        = "ubuntu"
+    private_key = var.ssh_private_key
+    timeout     = "10m" # la instancia tarda en aceptar SSH tras crearse
+  }
+
+  provisioner "file" {
+    source      = "${path.module}/scripts/instalar-docker.sh"
+    destination = "/tmp/instalar-docker.sh"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      # Espera a que cloud-init termine la configuración base de Ubuntu.
+      "cloud-init status --wait > /dev/null || true",
+      "sudo bash /tmp/instalar-docker.sh",
+    ]
+  }
 }
