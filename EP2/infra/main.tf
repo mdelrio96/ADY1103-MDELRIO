@@ -2,11 +2,12 @@
 # EP2 · Infraestructura AndysMotors en AWS Academy Learner Lab
 #
 # Solo red y cómputo: dos EC2 Ubuntu 24.04 y sus Security Groups.
-#   andys-plataforma  aquí se instala a mano la plataforma AndysMotors
+#   andys-plataforma  aquí se instala la plataforma AndysMotors
 #                     (Casos/AndysMotors/demo del repositorio del docente)
-#   andys-monitoreo   aquí se instalan a mano Prometheus y Grafana
+#   andys-monitoreo   aquí se instalan Prometheus y Grafana
 #
-# No hay user_data: ambas máquinas parten limpias.
+# Ambas máquinas arrancan con Docker Engine y Docker Compose instalados
+# (scripts/instalar-docker.sh). Todo lo demás se instala a mano.
 # ─────────────────────────────────────────────────────────────
 
 terraform {
@@ -180,6 +181,11 @@ resource "aws_instance" "plataforma" {
   key_name                    = var.key_name
   associate_public_ip_address = true
 
+  # Instala Docker en el primer arranque. Si el script cambia, la instancia se
+  # recrea: user_data solo se ejecuta una vez y, sin esto, el cambio no tendría efecto.
+  user_data                   = file("${path.module}/scripts/instalar-docker.sh")
+  user_data_replace_on_change = true
+
   root_block_device {
     volume_size           = var.root_volume_size
     volume_type           = "gp3"
@@ -203,6 +209,11 @@ resource "aws_instance" "monitoreo" {
   iam_instance_profile        = data.aws_iam_instance_profile.lab.name
   key_name                    = var.key_name
   associate_public_ip_address = true
+
+  # Instala Docker en el primer arranque. Si el script cambia, la instancia se
+  # recrea: user_data solo se ejecuta una vez y, sin esto, el cambio no tendría efecto.
+  user_data                   = file("${path.module}/scripts/instalar-docker.sh")
+  user_data_replace_on_change = true
 
   root_block_device {
     volume_size           = var.root_volume_size

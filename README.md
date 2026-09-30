@@ -8,12 +8,14 @@ Open Source con Prometheus y Grafana sobre AWS Academy Learner Lab.
 ```
 .github/workflows/infraestructura.yaml   # Run workflow: apply | plan | destroy
 EP2/infra/                               # Terraform: 2 EC2 + Security Groups
+EP2/infra/scripts/instalar-docker.sh     # user_data: Docker Engine + Compose
 ```
 
 ## Infraestructura
 
-El workflow crea solo red y cómputo. Ambas instancias son Ubuntu 24.04, parten limpias (sin
-`user_data`) y se configuran a mano.
+El workflow crea red y cómputo. Ambas instancias son Ubuntu 24.04 y arrancan con Docker Engine y
+Docker Compose instalados ([`EP2/infra/scripts/instalar-docker.sh`](EP2/infra/scripts/instalar-docker.sh),
+unos 2 minutos después de crearse). La plataforma, los exporters y el stack de monitoreo se instalan a mano.
 
 | Instancia | Tipo | Para qué |
 |---|---|---|
