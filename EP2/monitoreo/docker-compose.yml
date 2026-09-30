@@ -1,0 +1,43 @@
+# Stack de observabilidad AndysMotors: Prometheus + Grafana.
+# La clave de Grafana se lee de .env (copiar .env.example y editar).
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      # Rotación de datos: se borra lo que supere 15 días o 5 GB.
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=5GB
+      # Permite recargar la configuración con POST /-/reload.
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks: [monitoring]
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: grafana
+    restart: unless-stopped
+    depends_on: [prometheus]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks: [monitoring]
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  monitoring:

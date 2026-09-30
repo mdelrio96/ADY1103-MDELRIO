@@ -7,9 +7,14 @@ Open Source con Prometheus y Grafana sobre AWS Academy Learner Lab.
 
 ```
 .github/workflows/infraestructura.yaml   # Run workflow: apply | plan | destroy
-EP2/infra/                               # Terraform: 2 EC2 + Security Groups
+EP2/infra/                               # Terraform: 2 EC2 + Security Groups (lo usa el workflow)
 EP2/infra/scripts/instalar-docker.sh     # Docker Engine + Compose, ejecutado por SSH en el apply
+EP2/plataforma/exporters/                # node-exporter + postgres-exporter  → andys-plataforma
+EP2/monitoreo/                           # Prometheus + Grafana               → andys-monitoreo
+EP2/monitoreo/prometheus/prometheus.yml  # configuración de recolección (entregable)
 ```
+
+Las carpetas `plataforma/` y `monitoreo/` no las usa el workflow: se clonan y copian a mano en cada EC2.
 
 ## Infraestructura
 

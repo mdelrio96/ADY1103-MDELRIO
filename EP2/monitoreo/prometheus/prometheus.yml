@@ -1,0 +1,53 @@
+# ─────────────────────────────────────────────────────────────
+# Prometheus · AndysMotors (EP2 ADY1103)
+# Recolección tipo pull desde andys-monitoreo hacia andys-plataforma.
+# Los targets usan la IP PRIVADA de andys-plataforma (172.31.91.52): se
+# conserva al detener y encender la instancia, a diferencia de la pública.
+# ─────────────────────────────────────────────────────────────
+
+global:
+  scrape_interval: 15s        # frecuencia de recolección
+  evaluation_interval: 15s    # frecuencia de evaluación de reglas
+  external_labels:
+    empresa: andysmotors
+    entorno: lab
+
+scrape_configs:
+  # Autoobservación: estado del propio servidor Prometheus.
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Plataformas de negocio: métricas técnicas (peticiones, latencia) y de
+  # negocio (agendamientos, oportunidades, ventas, pagos).
+  - job_name: andys-plataformas
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["172.31.91.52:8081"]
+        labels: { plataforma: sitio-web }
+      - targets: ["172.31.91.52:8082"]
+        labels: { plataforma: stock }
+      - targets: ["172.31.91.52:8083"]
+        labels: { plataforma: agendamiento }
+      - targets: ["172.31.91.52:8084"]
+        labels: { plataforma: crm }
+      - targets: ["172.31.91.52:8085"]
+        labels: { plataforma: pagos }
+      - targets: ["172.31.91.52:8086"]
+        labels: { plataforma: proveedor-pagos }
+
+  # Balanceador HAProxy: disponibilidad y respuestas por backend.
+  - job_name: haproxy
+    static_configs:
+      - targets: ["172.31.91.52:8404"]
+
+  # node-exporter: CPU, memoria, disco y red de la EC2 de la plataforma.
+  - job_name: node
+    static_configs:
+      - targets: ["172.31.91.52:9100"]
+        labels: { instancia: andys-plataforma }
+
+  # postgres-exporter: estado y conexiones de la base de datos central.
+  - job_name: postgres
+    static_configs:
+      - targets: ["172.31.91.52:9187"]
