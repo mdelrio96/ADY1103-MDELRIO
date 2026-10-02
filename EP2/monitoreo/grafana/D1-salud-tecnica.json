@@ -128,7 +128,7 @@
       "id": 2,
       "type": "timeseries",
       "title": "Disponibilidad por plataforma (SLI 1 · SLO 99,9 %)",
-      "description": "Porcentaje de peticiones respondidas con 2xx o 3xx sobre el total, por plataforma. La zona roja marca el incumplimiento del SLO de 99,9 % de la ventana comercial.",
+      "description": "Porcentaje de peticiones atendidas sin error de servidor (todo menos 5xx), por plataforma. Un 4xx, como el 402 de una tarjeta rechazada, es una respuesta correcta del sistema y no cuenta como caída. La zona roja marca el incumplimiento del SLO de 99,9 %.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -146,7 +146,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A",
-          "expr": "100 * sum by (servicio) (rate(http_requests_total{status_code=~\"2..|3..\"}[5m]))\n  / sum by (servicio) (rate(http_requests_total[5m]))",
+          "expr": "100 * sum by (servicio) (rate(http_requests_total{status_code!~\"5..\"}[5m]))\n  / sum by (servicio) (rate(http_requests_total[5m]))",
           "legendFormat": "{{servicio}}",
           "range": true
         }
