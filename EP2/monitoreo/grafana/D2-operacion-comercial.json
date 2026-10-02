@@ -113,8 +113,8 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "Ventas cerradas (última hora)",
-      "description": "Ventas registradas por los ejecutivos en el CRM durante la última hora.",
+      "title": "Pagos aprobados (última hora)",
+      "description": "Pagos autorizados por el proveedor externo durante la última hora: ventas efectivamente cobradas en caja.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -132,8 +132,8 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A",
-          "expr": "sum(increase(ventas_cerradas_total[1h]))",
-          "legendFormat": "Ventas",
+          "expr": "sum(increase(pagos_total{resultado=\"aprobado\"}[1h]))",
+          "legendFormat": "Pagos aprobados",
           "range": true
         }
       ],
@@ -175,8 +175,8 @@
     {
       "id": 3,
       "type": "stat",
-      "title": "Monto vendido (última hora)",
-      "description": "Monto en pesos chilenos de las ventas cerradas durante la última hora.",
+      "title": "Monto transado (última hora)",
+      "description": "Monto en pesos chilenos de los pagos aprobados durante la última hora.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -194,7 +194,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "refId": "A",
-          "expr": "sum(increase(monto_vendido_clp_total[1h]))",
+          "expr": "sum(increase(monto_transado_clp_total[1h]))",
           "legendFormat": "Monto",
           "range": true
         }
